@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="c9914107-3216-409b-b25d-8337cf421377" name="practicas-vr" url="http://practicas-vr.dmariaa.es">
+        <fileTransfer rootFolder="/var/websites/practicas-vr" accessType="SFTP" host="www.dmariaa.es" port="22" sshConfigId="f36836d8-4dd3-41f8-a805-368139a34026" sshConfig="personal" authAgent="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Robotics Visions Exercises</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="css/bootstrap.css" rel="stylesheet">
+
+    <!-- Custom CSS for the '3 Col Portfolio' Template -->
+    <link href="css/3-col-portfolio.css" rel="stylesheet">
+</head>
+
+<body>
+    <nav class="navbar navbar-fixed-top navbar-inverse" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-ex1-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <!-- <a class="navbar-brand" href="http://startbootstrap.com">Start Bootstrap</a> -->
+            </div>
+
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse navbar-ex1-collapse">
+                <ul class="nav navbar-nav">
+                    <li><a href="follow_line.html">About</a></li>
+                    <!-- <li><a href="#services">Services</a></li>
+                    <li><a href="#contact">Contact</a></li> -->
+                </ul>
+            </div><!-- /.navbar-collapse -->
+        </div><!-- /.container -->
+    </nav>
+
+    <div class="container">
+        <div class="row">
+
+            <div class="col-lg-12">
+                <h1 class="page-header">Follow the line</h1>
+            </div>
+
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <p>This exercise consists of programming the brain of a robotic simulated F1 car to follow a red line along
+                a circuit. All the basics, docker machine, web interface and so are kindly provided by
+                <a href="https://unibotics.org/academy">Unibotics academy</a> and the <a href="https://jderobot.github.io/">JdeRobot project</a></p>
+            </div>
+            <div class="col-lg-12 text-center">
+                <iframe width="560" height="315"
+                        src="https://www.youtube.com/embed/DTMuN_8Gx_I?rel=0&modestbranding=1&fs=0&controls=0&mute=1&loop=1&autoplay=1"
+                        title="YouTube video player"
+                        frameborder="0"
+                        sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowfullscreen></iframe>
+            </div>
+        </div>
+
+        <!-- FIRST STEPS -->
+        <hr />
+        <div class="row">
+            <h3>First steps</h3>
+            <div class="col-lg-12">
+                <p>
+                    First task is to set up the objective that must drive the brain of our F1. In this exercise, the target is
+                    to follow the red line drawn in the middle of the circuit's road. To achieve this objective we will try to
+                    maintain this red line as much in the center of the screen as possible.
+                </p>
+                <p>
+                    So first, we need to extract the red line from our robot vision system. This is a simple task, as
+                    we don't have to deal with illumination conditions or dealing with other red objects in the view, thanks
+                    to our simplified environment. A color masking in HSV color space, searching for red color, and a couple
+                    erosion and dilation operations leave us with a pretty decent mask of the line.
+                </p>
+<!--
+                <pre class="prettyprint">
+    hsv_image = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2HSV)
+    mask1 = cv2.inRange(hsv_image, self.line_color_pattern[0, 0], self.line_color_pattern[0, 1])
+    mask2 = cv2.inRange(hsv_image, self.line_color_pattern[1, 0], self.line_color_pattern[1, 1])
+    mask = mask1 + mask2
+
+    mask = cv2.erode(mask, self.erosion_kernel, iterations=2)
+    mask = cv2.dilate(mask, self.erosion_kernel, iterations=2)</pre>
+-->
+                <div class="col-lg-6">
+                    <img src="images/camera_view.png" />
+                </div>
+                <div class="col-lg-6">
+                    <img src="images/camera_view_mask.png"/>
+                </div>
+                <p>
+                    Next step, it's time to detect when whe are out of the center of the line. We assume that the horizontal
+                    central point of the line should be centered at the horizontal central point of the screen. To have a better response,
+                    and anticipate earlier to curves, we've chosen to use the central point at the upper side of the
+                    line. To have a second measure of displacement, we have chosen to get a second central point in the middle
+                    vertical position of the line just in case we need it later. For these points we can calculate how much are
+                    they displaced from the horizontal center of the screen.
+                </p>
+<!--
+                <pre class="prettyprint">
+    d = np.argwhere(mask > 0)
+
+    y1 = d[0, 0]
+    b1 = np.nonzero(mask[y1:y1 + 1, :])[1]
+
+    y2 = d[0, 0] + ((d[-1, 0] - d[0, 0]) // 2)
+    b2 = np.nonzero(mask[y2:y2 + 1, :])[1]</pre>
+-->
+                <div class="col-lg-6">
+                    <img src="images/camera_view1_centroids.png" />
+                </div>
+                <div class="col-lg-6">
+                    <img src="images/camera_view2_centroids.png"/>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLLING THE F1 -->
+        <hr />
+        <div class="row">
+            <h3>Controlling the F1</h3>
+            <div class="col-lg-12">
+                <p>
+                    Now that we have got the vision system of our car working, and we know how far the car is from the central
+                    line, it's time to control it by steering and accelerating accordingly. The task in the exercise is to
+                    achieve this by implementing a <a href="https://en.wikipedia.org/wiki/PID_controller">PID controller</a>.
+                </p>
+                <p>
+                    <ul>
+                        <li>P Controller: <p>The Proportional controller just gets proportional to the error obtained from the vision system.
+                            <br />In our implementation: <strong>P = error</strong></p></li>
+                        <li>I Controller: <p>The Integral controller integrates de amount of error over time, so if the I controller
+                        takes much time or is no enough to get error to zero, this terms augments and forces it. <br/>In out implementation:
+                        <strong>I = I + error * delta_time</strong></p></li>
+                        <li>D Controller: <p>The Derivative controller calculates the rate of change of the error, by calculating the derivative of error over time.
+                        <br />In our discrete implementation: <strong>D=(error - previous_error) / delta_time</strong></p></li>
+                    </ul>
+                </p>
+                <p>
+                    The three controllers are integrated to choose how much do we have to steer to return the F1 to it's
+                    path following the line. Three constants <strong>Kp, Ki and Kd</strong> respectively tune the amount of
+                    each of the controllers involved in the final response.
+                    The final PID returned in our implementation: <strong>PDI = Kp * P + Kd * d + Ki * I</strong>
+                </p>
+                <p>
+                    Finally, to avoid peaks when the values go too high, we apply a low pass filter to the result of the
+                    PID controller. This low pass filter keeps the absolute value of the controller between 0.0 and 4.0, or the
+                    value between -4.0 and 4.0.
+                </p>
+            </div>
+        </div>
+
+        <!-- TUNNING THE CONTROLLER -->
+        <hr />
+        <div class="row">
+            <h3>Tunning the controller</h3>
+            <!-- LOW SPEED TUNING -->
+            <div class="col-lg-12">
+                <h4>Tuning at low speed</h4>
+                <p>
+                    This has been probably the hardest and trickiest part of the exercise. Tuning the parameters of the
+                    PID controller has supposed to do a lot of trial and error tests on the simulator.
+                    We've started by running a lap at low speed [<strong>V=4</strong>] and see what happens.
+                </p>
+
+                <!-- FIRST TEST RUN -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="col-lg-6">
+                            <p>
+                                First attempt with only a Proportional controller. Using a value of [<strong>Kp=2.0]</strong>]
+                                for the Proportional controller and [<strong>Kd=0.0</strong>], [<strong>Ki=0.0</strong>]
+                                for the other two, Integral and Derivative controllers, we achieved to perform a full lap without
+                                crashes, but the car drifted away from the line a little bit in curves so the value of
+                                the Proportional controller wasn't enough to keep the car over the red line during all lap.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/7dspm6GxVpM?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECOND TEST RUN -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="col-lg-6">
+                            <p>
+                                So the obvious reaction is to increase the weight of the Proportional controller. Trying a
+                                value of [<strong>Kp=5.0</strong>] makes the controller overreact in curves, and makes
+                                it start to oscillate. This oscillations go very high, only limited by the low pass
+                                filter of the PID controller.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/Tasea0XbmSg?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- THIRD TEST RUN  -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="col-lg-6">
+                            <p>
+                                With this effect in mind, we get to a compromise value for the weight of the Proportional
+                                controller. This value is [<strong>Kp=3.5</strong>] and it keeps the car centered in the
+                                line with no or almost no oscillations. At this speed we complete the test course in about 1:52.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/Lgr_fMcSn7M?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OTHER CIRCUITS LOW SPEED  -->
+                <div class="row">
+                    <div class="col-lg-12">
+                            <p>
+                                To verify this low speed controller works fine in other courses, we have tested it in
+                                Montreal and Montmelo circuits in the simulator. And it correctly completes both of them
+                                maintaining the car aligned with the red line.
+                            </p>
+                    </div>
+                    <div class="">
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/4oqFZOBTlbs?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/Aix2M6xR70I?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+
+            <!-- HIGH SPEED TUNING -->
+            <div class="col-lg-12">
+                <h4>Tuning at high speed</h4>
+                <p>
+                    Now that we have the controller performing well at low speeds, it's time to go for high speed
+                    rates. To start our high speed test, we double the speed [<strong>V=8</strong>] and try our previous
+                    low speed setup to see how it performs now.
+                </p>
+
+                <!-- FIRST TEST RUN -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="col-lg-6">
+                            <p>
+                                Still we are using only the Proportional controller, with same weight [<strong>Kp=3.5</strong>]
+                                and [<strong>Ki=0.0</strong>], [<strong>Kd=0.0</strong>]. At this speed, the car drifts away a
+                                lot more, mostly at curve start, but there is not much bouncing and it gets back to the line
+                                pretty quickly. So we get again to complete the lap and this time we do it is less than one minute.
+                            </p>
+                            <p>
+                                During the tests, a lot, we have done at this speed, we realize that there is not much
+                                more we can do by keeping a P controller only. Higher values lead to bounce too much and crash,
+                                smaller values lead to not enough steering and crash too.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/-UU7qI7RX34?rel=0&fs=1&controls=1&loop=1&autoplay=0&modestbranding=1"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECOND TEST RUN -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <div class="col-lg-6">
+                            <p>
+                                Now we start tuning the Differential controller. Increasing the value step by step we
+                                have realized that we can react stronger to curves without bouncing. That has allowed us to
+                                move up the Proportional controller weight to [<strong>Kp=5.0</strong>] and tested different
+                                values for the Differential controller weight. By testing we have calculated that a value
+                                between 6.0 and 7.0 for the differential controller performs quite well, the final value
+                                we have chosen is [<strong>Kd=6.5</strong>].
+
+                                As a side effect, by keeping the car centered in the line and avoiding bouncing we have
+                                reduced the lap time by a couple seconds.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/TWRJQCmSi80?rel=0&fs=1&controls=1&loop=1&autoplay=0&modestbranding=1"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OTHER CIRCUITS HIGH SPEED  -->
+                <div class="row">
+                    <div class="col-lg-12">
+                        <p>
+                            Now it's time to verify if this high speed controller works fine in the other courses.
+                            Again we have tested it in Montreal and Montmelo circuits in the simulator, and it seems to
+                            perform quite well on both of them, though we can see high bouncing in tricky curves of
+                            both circuits.
+
+                            In Montmelo circuit we have tested it's stability by performing several lapses, for a total
+                            of more than ten, without a crash.
+                        </p>
+                    </div>
+                    <div class="">
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/TUwVIQYEfbY?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                        <div class="col-lg-6">
+                            <iframe width="560" height="315"
+                                    src="https://www.youtube.com/embed/YjaE29doPxQ?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                    title="YouTube video player"
+                                    frameborder="0"
+                                    sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                    allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- FINE TUNNING -->
+        <hr />
+        <div class="row">
+            <h3>Tunning car speed</h3>
+            <div class="col-lg-12">
+                <p>
+                    For what we have seen so far, the steering controller performs quite well, but it fails more and more
+                    as we increase speed in curves. It seems obvious that on the other side we can increase speed a lot
+                    in straight areas. Therefor we need to slow down in curves and speed up in straights.
+                </p>
+            </div>
+
+            <!-- FIRST TEST RUN -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="col-lg-6">
+                        <p>
+                            The approach we decided to use to increase car speed in straights while lowering it down
+                            in curves was to model speed with a function that reacts inverse to steering. When steering
+                            reaches 0 we want to go at fastest speed, while when steering increases we want to lower the
+                            speed.
+                        </p>
+                        <p>
+                            We decided to model this with a gaussian function centered in 0, where it should reach it's
+                            maximum value. We want it to decrease fast enough, but as gaussian value approaches value 0 when
+                            it moves away from it's center, we have chosen to set a minimum value that we think we can handle
+                            curves quite good. We decided this minimum value to be [<strong>V=8</strong>] and maximum
+                            [<strong>V=15</strong>], so we modeled the speed as:
+                            <pre class="prettyprint">
+    v_e = pdi_controller.PDI * 1.5
+    v = max(8.0, 15 * math.exp(-abs(v_e) ** 2))</pre>
+                        </p>
+                        <p>
+                            We have experimented to get the best performing values we could find. The hardest challenge
+                            is curve entrance, as we come at real fast speed, we have found the best performance
+                            at [<strong>Kp=4.25</strong>], [<strong>Kd=5.75</strong>]. We couldn't find any improvemente by
+                            using I controller, maybe due to our implementation, so we left [<strong>Ki=0.0</strong>].
+                        </p>
+                        <p>
+                            With this variable speed we complete the test circuit in 39 seconds, nod bad. The car bounces
+                            in the beginning of curves, but it recovers quite well and doesn't crash in this circuit.
+                        </p>
+                    </div>
+                    <div class="col-lg-6">
+                        <iframe width="560" height="315"
+                                src="https://www.youtube.com/embed/YlqmtGr8TZw?rel=0&fs=1&controls=1&loop=1&autoplay=0"
+                                title="YouTube video player"
+                                frameborder="0"
+                                sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowfullscreen></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FINE TUNNING -->
+        <hr />
+        <div class="row">
+            <h3>Future enchancements</h3>
+            <div class="col-lg-12">
+                <p>
+                    So far the practice. There are some more improvements to do:
+                </p>
+                <ul>
+                    <li><strong>Find the line: </strong>Look for the line if the simulation doesn't start aligned to it.
+                    This looks easy to implemente, during initialization just spin until you are aligned with the red line.</li>
+                    <li><strong>Incremental controller: </strong> Tune the incremental controller and use it to improve
+                    performance</li>
+                    <li><strong>Speed PID controller: </strong> So far the PID controller is implemented as a class, so it can
+                    be reused. We will try to control speed using a PID controller, just to check if we can achieve a better performance</li>
+                    <li><strong>Variable PID controller: </strong> Use different PID controllers for straights and curves.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <hr>
+
+        <footer>
+            <div class="row">
+                <div class="col-lg-12">
+                    <p>Copyright &copy; David María Arribas <span id="getCurrentDate"></span></p>
+                </div>
+            </div>
+        </footer>
+
+    </div><!-- /.container -->
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
+    <script src="js/jquery-1.10.2.js"></script>
+    <script src="js/bootstrap.js"></script>
+    <script type="text/javascript">
+      var dt = new Date();
+      document.getElementById('getCurrentDate').innerHTML = dt.getFullYear();
+    </script>
+</body>
+</html>
